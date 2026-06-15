@@ -9,7 +9,12 @@
     "preview": "vite preview"
   },
   "devDependencies": {
+    "@tweakpane/core": "^2.0.5",
+    "@webgpu/types": "^0.1.70",
     "typescript": "~6.0.2",
     "vite": "^8.0.12"
+  },
+  "dependencies": {
+    "tweakpane": "^4.0.5"
   }
 }
