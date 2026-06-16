@@ -41,6 +41,7 @@ export class Screen {
   private cachedPixelBuffer: GPUBuffer | null = null;
   private rebindPixelBuffer() {
     this.screenBindGroup = this.device.createBindGroup({
+      label: " Screen Bind Group ",
       layout: this.screenRenderPipeline.getBindGroupLayout(0),
       entries: [
         {
@@ -69,6 +70,7 @@ export class Screen {
 
     const commandEncoder = this.device.createCommandEncoder();
     const renderPass = commandEncoder.beginRenderPass({
+      label: " Screen Render Pass ",
       colorAttachments: [
         {
           view: ctx.getCurrentTexture().createView(),
