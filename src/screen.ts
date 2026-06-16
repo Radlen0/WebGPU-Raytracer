@@ -5,7 +5,7 @@ export class Screen {
 
   private screenRenderPipeline: GPURenderPipeline;
   private resolutionUniform: GPUBuffer;
-  private screenBindGroup: GPUBindGroup;
+  private screenBindGroup: GPUBindGroup | null = null;
 
   constructor(device: GPUDevice) {
     this.device = device;
@@ -36,16 +36,6 @@ export class Screen {
       size: 4 * 2, // 2 * 32 bit integer for height and width
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
-
-    this.screenBindGroup = this.device.createBindGroup({
-      layout: this.screenRenderPipeline.getBindGroupLayout(0),
-      entries: [
-        {
-          binding: 0,
-          resource: { buffer: this.resolutionUniform },
-        },
-      ],
-    });
   }
 
   private cachedPixelBuffer: GPUBuffer | null = null;
@@ -66,7 +56,7 @@ export class Screen {
   }
 
   public display(ctx: GPUCanvasContext, pixelBuffer: GPUBuffer) {
-    if (pixelBuffer != this.cachedPixelBuffer) {
+    if (pixelBuffer != this.cachedPixelBuffer || !this.screenBindGroup) {
       this.cachedPixelBuffer = pixelBuffer;
       this.rebindPixelBuffer();
     }
