@@ -1,6 +1,8 @@
 import "./style.css";
 import { Screen } from "./screen";
 import { Tracer } from "./compute";
+import { type Camera } from "./types";
+import { CameraController } from "./helper/cameraController";
 import { quitIfWebGPUNotAvailable } from "./utils";
 
 /* === SETUP & INITIALIZATION === */
@@ -22,9 +24,21 @@ canvasCtx.configure({
   usage: GPUTextureUsage.RENDER_ATTACHMENT,
 });
 
+// --- INITIALIZATIONS ---
 const screen = new Screen(device);
 const tracer = new Tracer(device);
 let pixelStorageBuffer: GPUBuffer | null = null;
+
+const cameraController = new CameraController(canvas, 4.0);
+
+const globalCamera: Camera = {
+  origin: new Float32Array([0, 0, 4]),
+  lookat: new Float32Array([0, 0, 0]), // Pointing at world center
+  FOV: 1.0, // Swapped to a standard wide-angle view (~60 deg) for visual context
+  focalLength: 1.0,
+  screenHeight: canvasCtx.canvas.height,
+  screenWidth: canvasCtx.canvas.width,
+};
 
 /* === BUFFER MANAGEMENT === */
 
@@ -76,8 +90,14 @@ pixelStorageBuffer = reallocatePixelBuffer(device, canvas.width, canvas.height);
 /* === MAIN RENDER LOOP === */
 
 function renderLoop() {
+  globalCamera.screenWidth = canvasCtx.canvas.width;
+  globalCamera.screenHeight = canvasCtx.canvas.height;
+
+  // Read mouse state updates and adjust globalCamera.origin
+  cameraController.updateCamera(globalCamera);
+
   if (pixelStorageBuffer) {
-    tracer.run(canvasCtx, pixelStorageBuffer);
+    tracer.run(globalCamera, pixelStorageBuffer);
     screen.display(canvasCtx, pixelStorageBuffer);
   }
   requestAnimationFrame(renderLoop);
