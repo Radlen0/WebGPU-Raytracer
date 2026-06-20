@@ -6,6 +6,7 @@ export class Screen {
   private screenRenderPipeline: GPURenderPipeline;
   private resolutionUniform: GPUBuffer;
   private screenBindGroup: GPUBindGroup | null = null;
+  private cachedPixelBuffer: GPUBuffer | null = null;
 
   constructor(device: GPUDevice) {
     this.device = device;
@@ -38,8 +39,11 @@ export class Screen {
     });
   }
 
-  private cachedPixelBuffer: GPUBuffer | null = null;
-  private rebindPixelBuffer() {
+  /**
+   * Refreshes the bind group bindings if the target output canvas buffer changes.
+   */
+  private updateBindGroup(pixelBuffer: GPUBuffer) {
+    this.cachedPixelBuffer = pixelBuffer;
     this.screenBindGroup = this.device.createBindGroup({
       label: " Screen Bind Group ",
       layout: this.screenRenderPipeline.getBindGroupLayout(0),
@@ -56,12 +60,15 @@ export class Screen {
     });
   }
 
+  /**
+   * Displays the computed pixels to the screen
+   */
   public display(ctx: GPUCanvasContext, pixelBuffer: GPUBuffer) {
     if (pixelBuffer != this.cachedPixelBuffer || !this.screenBindGroup) {
-      this.cachedPixelBuffer = pixelBuffer;
-      this.rebindPixelBuffer();
+      this.updateBindGroup(pixelBuffer);
     }
 
+    // Pack & upload uniform to GPU
     let resolutionArray = new Uint32Array([
       ctx.canvas.width,
       ctx.canvas.height,
