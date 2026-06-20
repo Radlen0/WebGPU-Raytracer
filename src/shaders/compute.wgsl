@@ -4,7 +4,7 @@ var<storage, read_write> s_pixel_data : array<vec4f>;
 struct CameraUniform {
     camera_origin: vec3f,     // Camera position in world space
     pad0: u32,
-    viewport_top_left: vec3f,   // Top-left pixel location in world space
+    pixel00_loc: vec3f,   // Top-left pixel location in world space
     pad1: u32,
     pixel_delta_u: vec3f,     // Offset vector to move one pixel right
     pad2: u32,
@@ -55,5 +55,5 @@ fn computeMain(@builtin(global_invocation_id) id: vec3u) {
 }
 
 fn get_pixel_world_position(uv: vec2f) -> vec3f {
-  return u_camera.viewport_top_left + (uv.x * u_camera.pixel_delta_u) + (uv.y * u_camera.pixel_delta_v);
+  return u_camera.pixel00_loc + (uv.x * u_camera.pixel_delta_u) + (uv.y * u_camera.pixel_delta_v);
 }

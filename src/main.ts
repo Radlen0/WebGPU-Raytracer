@@ -4,6 +4,7 @@ import { Tracer } from "./compute";
 import { type Camera } from "./types";
 import { CameraController } from "./helper/cameraController";
 import { quitIfWebGPUNotAvailable } from "./utils";
+import { DebugPannel } from "./debugPanel";
 
 /* === SETUP & INITIALIZATION === */
 
@@ -30,6 +31,7 @@ const tracer = new Tracer(device);
 let pixelStorageBuffer: GPUBuffer | null = null;
 
 const cameraController = new CameraController(canvas, 4.0);
+const debugPannel = new DebugPannel();
 
 const globalCamera: Camera = {
   origin: new Float32Array([0, 0, 4]),
@@ -61,27 +63,7 @@ function reallocatePixelBuffer(
     label: " Pixel Storage Buffer ",
     size: bufferSize,
     usage: GPUBufferUsage.STORAGE,
-    mappedAtCreation: true,
   });
-
-  // Float array to populate the updatePixelBuffer
-  const totalFloats = width * height * 4;
-  const floatArray = new Float32Array(totalFloats);
-
-  let index = 0;
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      floatArray[index + 0] = y / height; // R: Vertical gradient
-      floatArray[index + 1] = x / width; // G: Horizontal gradient
-      floatArray[index + 2] = 0.5; // B: Constant padding
-      floatArray[index + 3] = 0.1; // A: Constant padding
-      index += 4;
-    }
-  }
-
-  // Write data directly into the mapped GPU memory range
-  new Float32Array(newBuffer.getMappedRange()).set(floatArray);
-  newBuffer.unmap();
 
   return newBuffer;
 }
@@ -90,6 +72,9 @@ pixelStorageBuffer = reallocatePixelBuffer(device, canvas.width, canvas.height);
 /* === MAIN RENDER LOOP === */
 
 function computeLoop() {
+  debugPannel.updateComputefps();
+  let startTime = performance.now();
+
   globalCamera.screenWidth = canvasCtx.canvas.width;
   globalCamera.screenHeight = canvasCtx.canvas.height;
 
@@ -97,6 +82,7 @@ function computeLoop() {
     tracer.run(globalCamera, pixelStorageBuffer);
   }
 
+  debugPannel.updateJSTime(startTime);
   setTimeout(computeLoop, 0);
 }
 
@@ -109,7 +95,6 @@ function renderLoop() {
 
   requestAnimationFrame(renderLoop);
 }
-
 
 computeLoop();
 requestAnimationFrame(renderLoop);
