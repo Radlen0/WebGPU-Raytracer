@@ -28,8 +28,14 @@ fn get_ray_position(ray: Ray, t: f32) -> vec3f {
     return ray.origin + (ray.direction * t);
 }
 
-const camera_origin = vec3f(0.0, 0.0, 0.0);
-const camera_focal_length = 0.5;
+fn hitSphere(r: Ray, center: vec3f, radius: f32) -> bool {
+  let oc = r.origin - center;
+  let a = dot(r.direction ,r.direction);
+  let b = 2 * dot(r.direction, oc);
+  let c = dot(oc, oc) - radius * radius;
+  let discriminant = b*b - 4 * a * c;
+  return discriminant >= 0;
+}
 
 // --- COMPUTE ENTRYPOINT ---
 @compute @workgroup_size(16, 16)
@@ -48,7 +54,12 @@ fn computeMain(@builtin(global_invocation_id) id: vec3u) {
     r.origin = u_camera.camera_origin;
     r.direction = normalize(ray_direction);
 
-    var pixel_color = vec4f(normalize(ray_direction), 1.0);
+    var pixel_color : vec4f;
+    if (hitSphere(r, vec3f(0, 0, 0), 1)) {
+      pixel_color = vec4f(1.0, 0.0, 0.0, 1.0);
+    } else {
+      pixel_color = vec4f(0.0, 0.0, 0.0, 1.0);
+    }
 
     let pixel_index = (v * u_camera.screen_width) + u;
     s_pixel_data[pixel_index] = pixel_color;
