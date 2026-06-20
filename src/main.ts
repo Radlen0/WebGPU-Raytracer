@@ -89,19 +89,29 @@ pixelStorageBuffer = reallocatePixelBuffer(device, canvas.width, canvas.height);
 
 /* === MAIN RENDER LOOP === */
 
-function renderLoop() {
+function computeLoop() {
   globalCamera.screenWidth = canvasCtx.canvas.width;
   globalCamera.screenHeight = canvasCtx.canvas.height;
 
-  // Read mouse state updates and adjust globalCamera.origin
+  if (pixelStorageBuffer) {
+    tracer.run(globalCamera, pixelStorageBuffer);
+  }
+
+  setTimeout(computeLoop, 0);
+}
+
+function renderLoop() {
   cameraController.updateCamera(globalCamera);
 
   if (pixelStorageBuffer) {
-    tracer.run(globalCamera, pixelStorageBuffer);
     screen.display(canvasCtx, pixelStorageBuffer);
   }
+
   requestAnimationFrame(renderLoop);
 }
+
+
+computeLoop();
 requestAnimationFrame(renderLoop);
 
 // === WINDOW RESIZE HANDLING ===
