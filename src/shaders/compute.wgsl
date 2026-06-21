@@ -28,13 +28,61 @@ fn get_ray_position(ray: Ray, t: f32) -> vec3f {
     return ray.origin + (ray.direction * t);
 }
 
-fn hitSphere(r: Ray, center: vec3f, radius: f32) -> bool {
-  let oc = r.origin - center;
-  let a = dot(r.direction ,r.direction);
-  let b = 2 * dot(r.direction, oc);
-  let c = dot(oc, oc) - radius * radius;
-  let discriminant = b*b - 4 * a * c;
-  return discriminant >= 0;
+struct HitInfo {
+  did_hit : bool,
+  distance : f32,
+  hit_point : vec3f,
+  normal : vec3f,
+  is_front : bool,
+}
+
+struct Sphere {
+  center: vec3f,
+  radius: f32,
+  color: vec4f,
+}
+
+fn hit_sphere(ray: Ray, sphere: Sphere) -> HitInfo {
+  var hit : HitInfo;
+  hit.did_hit = false;
+
+  let oc = ray.origin - sphere.center;
+
+  // Optimized Quadratic Coefficients (b = 2h)
+  let a = dot(ray.direction ,ray.direction);
+  let h = dot(ray.direction, oc);
+  let c = dot(oc, oc) - sphere.radius * sphere.radius;
+
+  // Quadratic Discriminant
+  let discriminant = h*h - a * c;
+
+  if (discriminant < 0.0) {
+    return hit;
+  }
+
+  let sqrt_d = sqrt(discriminant);
+  // Find the nearest root that lies in front of the camera (t > 0)
+  var root = (-h - sqrt_d) / a;
+  if (root <= 0) {
+    // If the first root is behind us, check the second one (inside the sphere)
+    var root = (-h + sqrt_d) / a;
+    if (root <= 0) {
+      return hit; // Both intersection points are behind the viewport
+    }
+  }
+
+  hit.did_hit   = true;
+  hit.distance  = root;
+  hit.hit_point = ray.origin + (ray.direction * root);
+
+  let outward_normal = (hit.hit_point - sphere.center) / sphere.radius;
+
+  // Face orientation handling:
+  // If dot product is negative, ray is hitting the outside (front face)
+  hit.is_front = dot(ray.direction, outward_normal) < 0.0;
+  hit.normal   = select(-outward_normal, outward_normal, hit.is_front);
+
+  return hit;
 }
 
 // --- COMPUTE ENTRYPOINT ---
@@ -54,12 +102,12 @@ fn computeMain(@builtin(global_invocation_id) id: vec3u) {
     r.origin = u_camera.camera_origin;
     r.direction = normalize(ray_direction);
 
-    var pixel_color : vec4f;
-    if (hitSphere(r, vec3f(0, 0, 0), 1)) {
-      pixel_color = vec4f(1.0, 0.0, 0.0, 1.0);
-    } else {
-      pixel_color = vec4f(0.0, 0.0, 0.0, 1.0);
-    }
+    var s : Sphere;
+    s.center = vec3f(0, 0, 0);
+    s.radius = 1;
+    s.color = vec4f(1.0, 0.0, 0.0, 1.0);
+
+    let pixel_color = select(vec4f(0.0, 0.0, 0.0, 0.0), s.color, hit_sphere(r, s).did_hit);
 
     let pixel_index = (v * u_camera.screen_width) + u;
     s_pixel_data[pixel_index] = pixel_color;
