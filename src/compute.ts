@@ -1,17 +1,21 @@
 import computeWGSL from "./shaders/compute.wgsl?raw";
-import type { Camera } from "./types";
+import type { Camera, Sphere } from "./types";
 import { vec3 } from "wgpu-matrix";
 
 export class Tracer {
   private device: GPUDevice;
 
   private computePipeline: GPUComputePipeline;
-  private computeBindGroup: GPUBindGroup | null = null;
+  private PixelBufferBindGroup: GPUBindGroup | null = null;
+  private sceneBindGroup: GPUBindGroup | null = null;
 
   private cachedPixelBuffer: GPUBuffer | null = null;
 
   private cameraUniform: GPUBuffer;
   private cameraStagingArray = new ArrayBuffer(20 * 4);
+
+  private sphereBuffer: GPUBuffer;
+  private sphereStagingArray = new ArrayBuffer(65536);
 
   constructor(device: GPUDevice) {
     this.device = device;
@@ -34,24 +38,41 @@ export class Tracer {
       size: 4 * 20,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
+
+    this.sphereBuffer = this.device.createBuffer({
+      label: " Sphere uniform buffer ",
+      size: 65536,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
+
+    this.sceneBindGroup = this.device.createBindGroup({
+      label: " Tracer Scene Bind Group ",
+      layout: this.computePipeline.getBindGroupLayout(1),
+      entries: [
+        {
+          binding: 0,
+          resource: { buffer: this.cameraUniform },
+        },
+        {
+          binding: 1,
+          resource: { buffer: this.sphereBuffer },
+        },
+      ],
+    });
   }
 
   /**
-   * Refreshes the bind group bindings if the target output canvas buffer changes.
+   * Refreshes the pixel buffer bind group if the target output canvas buffer changes.
    */
-  private updateBindGroup(pixelBuffer: GPUBuffer) {
+  private updatePixelBufferBindGroup(pixelBuffer: GPUBuffer) {
     this.cachedPixelBuffer = pixelBuffer;
-    this.computeBindGroup = this.device.createBindGroup({
-      label: " Tracer Compute Bind Group ",
+    this.PixelBufferBindGroup = this.device.createBindGroup({
+      label: " Tracer Pixel Buffer Bind Group ",
       layout: this.computePipeline.getBindGroupLayout(0),
       entries: [
         {
           binding: 0,
-          resource: { buffer: this.cachedPixelBuffer! },
-        },
-        {
-          binding: 1,
-          resource: { buffer: this.cameraUniform },
+          resource: { buffer: this.cachedPixelBuffer },
         },
       ],
     });
@@ -60,10 +81,10 @@ export class Tracer {
   /**
    * Executes the ray-tracing compute pass.
    */
-  public run(camera: Camera, pixelBuffer: GPUBuffer) {
+  public run(camera: Camera, spheres: Sphere[], pixelBuffer: GPUBuffer) {
     // Rebind only if the canvas/pixel output buffer swapped or was resized
-    if (pixelBuffer != this.cachedPixelBuffer || !this.computeBindGroup) {
-      this.updateBindGroup(pixelBuffer);
+    if (pixelBuffer != this.cachedPixelBuffer || !this.PixelBufferBindGroup) {
+      this.updatePixelBufferBindGroup(pixelBuffer);
     }
 
     // Calculate math and upload uniform block to GPU
@@ -73,6 +94,9 @@ export class Tracer {
       0,
       this.cameraStagingArray,
     );
+
+    // Populate the sphere and the material uniforms
+    this.updateSphereBuffer(spheres);
 
     // 16x16 workgroup sizes matching the compute shader configuration
     const WORKGROUP_SIZE = 16;
@@ -84,7 +108,8 @@ export class Tracer {
       label: " Tracer Compute Pass ",
     });
     computePass.setPipeline(this.computePipeline);
-    computePass.setBindGroup(0, this.computeBindGroup);
+    computePass.setBindGroup(0, this.PixelBufferBindGroup);
+    computePass.setBindGroup(1, this.sceneBindGroup);
     computePass.dispatchWorkgroups(dispatchX, dispatchY);
     computePass.end();
 
@@ -157,5 +182,40 @@ export class Tracer {
     // [Bytes 64-71] Screen Dimensions
     cameraDataView.setUint32(offset + 0, camera.screenWidth, isLittleEndian);
     cameraDataView.setUint32(offset + 4, camera.screenHeight, isLittleEndian);
+  }
+
+  private updateSphereBuffer(spheres: Sphere[]) {
+    const sphereView = new DataView(this.sphereStagingArray);
+
+    const sphereCount = spheres.length;
+    const sphereSizeBytes = /* Sphere Struct */ 16 + /* Material Struct */ 16;
+
+    // Write header: element count
+    sphereView.setUint32(0, sphereCount, true);
+
+    // Write array elements
+    let offset = 16;
+    for (const sphere of spheres) {
+      // center (vec3f)
+      sphereView.setFloat32(offset + 0, sphere.center[0], true);
+      sphereView.setFloat32(offset + 4, sphere.center[1], true);
+      sphereView.setFloat32(offset + 8, sphere.center[2], true);
+      // radius (f32)
+      sphereView.setFloat32(offset + 12, sphere.radius, true);
+      // material (Material)
+      // * Color (vec4f)
+      sphereView.setFloat32(offset + 16, sphere.material.color[0], true);
+      sphereView.setFloat32(offset + 20, sphere.material.color[1], true);
+      sphereView.setFloat32(offset + 24, sphere.material.color[2], true);
+      sphereView.setFloat32(offset + 28, sphere.material.color[3], true);
+
+      offset += sphereSizeBytes;
+    }
+
+    this.device.queue.writeBuffer(
+      this.sphereBuffer,
+      0,
+      this.sphereStagingArray,
+    );
   }
 }

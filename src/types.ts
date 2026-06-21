@@ -8,3 +8,13 @@ export interface Camera {
   origin: Vec3;
   lookat: Vec3;
 }
+
+export interface Sphere {
+  center: Vec3,
+  radius: number,
+  material: Material
+}
+
+export interface Material {
+  color: Vec3;
+}

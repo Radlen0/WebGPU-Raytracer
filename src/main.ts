@@ -1,7 +1,7 @@
 import "./style.css";
 import { Screen } from "./screen";
 import { Tracer } from "./compute";
-import { type Camera } from "./types";
+import { type Camera, type Sphere } from "./types";
 import { CameraController } from "./helper/cameraController";
 import { quitIfWebGPUNotAvailable } from "./utils";
 import { DebugPannel } from "./debugPanel";
@@ -71,6 +71,23 @@ pixelStorageBuffer = reallocatePixelBuffer(device, canvas.width, canvas.height);
 
 /* === MAIN RENDER LOOP === */
 
+const spheres: Sphere[] = [
+  {
+    center: new Float32Array([0, 0, 0]),
+    radius: 0.5,
+    material: {
+      color: new Float32Array([1.0, 0, 0, 1.0]),
+    },
+  },
+  {
+    center: new Float32Array([2.0, 0, 0]),
+    radius: 0.25,
+    material: {
+      color: new Float32Array([0.0, 1.0, 1.0, 1.0]),
+    },
+  },
+];
+
 function computeLoop() {
   debugPannel.updateComputefps();
   let startTime = performance.now();
@@ -79,7 +96,7 @@ function computeLoop() {
   globalCamera.screenHeight = canvasCtx.canvas.height;
 
   if (pixelStorageBuffer) {
-    tracer.run(globalCamera, pixelStorageBuffer);
+    tracer.run(globalCamera, spheres, pixelStorageBuffer);
   }
 
   debugPannel.updateJSTime(startTime);
