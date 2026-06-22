@@ -87,6 +87,7 @@ const spheres: Sphere[] = [
     },
   },
 ];
+debugPannel.bindSphereGeometry(spheres);
 
 function computeLoop() {
   debugPannel.updateComputefps();
